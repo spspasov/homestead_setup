@@ -1,3 +1,5 @@
+*This setup is no longer in use, but I decided to keep it here for posterity.*
+
 # Getting Started
 
 1. Clone the repository
