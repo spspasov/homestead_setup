@@ -1,0 +1,94 @@
+#!/bin/sh
+
+################################## Settings ##################################
+
+#define colours
+ERROR='\033[0;31m'
+SUCCESS='\033[0;32m'
+MESSAGE='\033[0;33m'
+NC='\033[0m' # No Color
+
+################################## Homestead ##################################
+
+HOMESTEAD_DIR=~/.homestead
+ENV_FILE=.env
+
+# First check if the Homestead directory exists
+# If it does, then we make a backup of it
+if [[ -d $HOMESTEAD_DIR ]]; then
+  printf "\n${MESSAGE}Backing up directory ~/.homestead to ~/.homestead_backup\n"
+  mv ~/.homestead ~/.homestead_backup
+fi
+
+# And then we create the new homestead dir
+printf "${MESSAGE}Creating new Homestead directory in ~/.homestead\n"
+mkdir ~/.homestead
+
+# Initialize Homestead which created Homestead.yaml and Vagrantfile in the project root dir
+php vendor/bin/homestead make
+
+# Add the version of the homestead machine we want to use
+# And save the file to the ~/.homestead directory
+sed '/provider/a \
+version: "0.3.0" \
+' Homestead.yaml >> ~/.homestead/Homestead.yaml
+
+# Remove Homestead.yaml file from project directory as it was already copied to ~/.homestead
+rm Homestead.yaml
+
+# Then we move the files from the project dir to the new ~/.homestead directory
+# printf "${MESSAGE}Move Homestead.yaml to ~/.homestead/Homestead.yaml\n"
+# cp Homestead.yaml ~/.homestead/Homestead.yaml
+printf "${MESSAGE}Move Vagrantfile to ~/.homestead/Vagrantfile\n"
+mv Vagrantfile ~/.homestead/Vagrantfile
+
+# This script is for doing any post-install work
+# If you want to have a particular package on the server
+# put the commands in there
+printf "${MESSAGE}Copy after.sh to ~/.homestead/after.sh\n"
+cp after.sh ~/.homestead/after.sh
+
+################################## Configuration ##################################
+# Make an alias for homestead
+source .shell-aliases.sh
+
+# Check if we have a .env file in the project directory
+if [[ ! -f $ENV_FILE ]]; then
+  # if we don't we create a new one from the .env.example file
+  printf "\n${MESSAGE}Creating .env file\n"
+  cp .env.example .env
+  # and set the api key
+  php artisan key:generate
+else
+
+  echo
+  read -p "I see you already have an existing .env file. Do you want me to setup your .env file to work with Homestead automatically (a backup will be created)? (y/N)" -n 1 -r
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    # first backup the existing .env file
+    printf "\n${MESSAGE}Backing up existing ${NC}.env ${MESSAGE}file to ${NC}.env.bak\n"
+    # this command first backs up the file to .env.bak
+    # then it deletes every line that matches the pattern DB_
+    sed -i.bak '/DB_/d' .env
+
+    # append the following lines after the pattern
+    # -i.deleted.bak is a hack for OSX
+    # to be able to edit the file in place
+    sed -i.deleted.bak '/APP_FALLBACK_LOCALE/a \
+    \
+    DB_CONNECTION=mysql \
+    DB_HOST=localhost \
+    DB_PORT=3306 \
+    DB_DATABASE=homestead \
+    DB_USERNAME=homestead \
+    DB_PASSWORD=secret' .env
+
+    # delete the file which is only used for the hack
+    rm .env.deleted.bak
+  fi
+fi
+
+################################## Fin ##################################
+
+printf "\n${SUCCESS}You can call the ${NC}homestead ${SUCCESS}command from the project's root directory.\n"
+printf "\n${SUCCESS}To run the VM, run ${NC}homestead up${SUCCESS}.\n"
+printf "${SUCCESS}Don't forget to add an entry in ${NC}/etc/hosts ${SUCCESS}for your newly created domain.\n"
